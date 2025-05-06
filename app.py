@@ -1,13 +1,13 @@
 from flask import Flask, request, jsonify
 import openai
 import os
-import requests  # for outbound HTTP requests
+import requests
 
 app = Flask(__name__)
-openai.api_key = os.getenv("OPENAI_API_KEY")
 
-# Replace this with your actual Power Automate webhook URL
-POWER_AUTOMATE_WEBHOOK_URL = os.getenv("POWER_AUTOMATE_WEBHOOK_URL")
+# Get environment variables
+openai.api_key = os.getenv("OPENAI_API_KEY")
+power_automate_url = os.getenv("POWER_AUTOMATE_WEBHOOK_URL")
 
 @app.route('/chat', methods=['POST'])
 def chat():
@@ -28,20 +28,27 @@ def chat():
         )
         answer = response['choices'][0]['message']['content']
 
-        # Push response to Power Automate via HTTP POST
+        # Send to Power Automate
         payload = {
             "prompt": user_input,
             "response": answer
         }
-        headers = {'Content-Type': 'application/json'}
 
-        try:
-            pa_response = requests.post(POWER_AUTOMATE_WEBHOOK_URL, json=payload, headers=headers)
-            pa_response.raise_for_status()
-        except requests.exceptions.RequestException as err:
-            print("Error posting to Power Automate:", err)
+        headers = {"Content-Type": "application/json"}
+
+        if power_automate_url:
+            try:
+                pa_response = requests.post(power_automate_url, json=payload, headers=headers)
+                pa_response.raise_for_status()
+            except requests.exceptions.RequestException as err:
+                print("Failed to send to Power Automate:", err)
 
         return jsonify({'response': answer})
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+# REQUIRED for Render: use dynamic port and 0.0.0.0
+if __name__ == '__main__':
+    port = int(os.environ.get("PORT", 10000))  # fallback port if PORT isn't set
+    app.run(host='0.0.0.0', port=port)
