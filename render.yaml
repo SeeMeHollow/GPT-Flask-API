@@ -2,8 +2,13 @@ services:
   - type: web
     name: chatgpt-flask-api
     env: python
+    region: oregon  # or Frankfurt/London/etc.
+    plan: free
     buildCommand: "pip install -r requirements.txt"
-    startCommand: "python app.py"
+    startCommand: "gunicorn app:app"
     envVars:
       - key: OPENAI_API_KEY
         sync: false
+      - key: POWER_AUTOMATE_WEBHOOK_URL
+        sync: false
+    healthCheckPath: /
