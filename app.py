@@ -1,10 +1,13 @@
 from flask import Flask, request, jsonify
 import openai
 import os
+import requests  # for outbound HTTP requests
 
 app = Flask(__name__)
+openai.api_key = os.getenv("OPENAI_API_KEY")
 
-openai.api_key = os.getenv('OPENAI_API_KEY')  # Use env variable
+# Replace this with your actual Power Automate webhook URL
+POWER_AUTOMATE_WEBHOOK_URL = os.getenv("POWER_AUTOMATE_WEBHOOK_URL")
 
 @app.route('/chat', methods=['POST'])
 def chat():
@@ -15,6 +18,7 @@ def chat():
         return jsonify({'error': 'No message provided'}), 400
 
     try:
+        # Generate ChatGPT response
         response = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
             messages=[
@@ -23,11 +27,21 @@ def chat():
             ]
         )
         answer = response['choices'][0]['message']['content']
+
+        # Push response to Power Automate via HTTP POST
+        payload = {
+            "prompt": user_input,
+            "response": answer
+        }
+        headers = {'Content-Type': 'application/json'}
+
+        try:
+            pa_response = requests.post(POWER_AUTOMATE_WEBHOOK_URL, json=payload, headers=headers)
+            pa_response.raise_for_status()
+        except requests.exceptions.RequestException as err:
+            print("Error posting to Power Automate:", err)
+
         return jsonify({'response': answer})
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-
-if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 5000))
-    app.run(debug=False, host='0.0.0.0', port=port)
